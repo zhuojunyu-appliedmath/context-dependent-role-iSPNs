@@ -11,7 +11,7 @@ from .config import SPN_COLORS, SPN_LINESTYLES, SPN_NAMES
 def plot_cbgt_profiles(feature_table: pd.DataFrame):
     feature_cols = [f"feature_{i:02d}" for i in range(12)]
     x = np.arange(12)
-    fig, ax = plt.subplots(figsize=(7.2, 3.8))
+    fig, ax = plt.subplots(figsize=(7, 3.6))
     for name in ["dSPN_left", "iSPN_left", "dSPN_right", "iSPN_right"]:
         values = feature_table.loc[feature_table["true_name"] == name, feature_cols].to_numpy(float)
         values = (values - values.mean(axis=1, keepdims=True)) / (values.std(axis=1, keepdims=True) + 1e-9)
@@ -23,11 +23,12 @@ def plot_cbgt_profiles(feature_table: pd.DataFrame):
         ax.fill_between(x[6:], mean[6:] - sem[6:], mean[6:] + sem[6:], color=SPN_COLORS[name], alpha=0.12)
     ax.axvline(5.5, color="0.5", linestyle=":")
     ax.set_xticks(x)
-    ax.set_xticklabels([f"L-{i}" for i in range(6, 0, -1)] + [f"R-{i}" for i in range(6, 0, -1)])
+    #ax.set_xticklabels([f"L-{i}" for i in range(6, 0, -1)] + [f"R-{i}" for i in range(6, 0, -1)])
+    ax.set_xticklabels([-60, -50, -40, -30, -20, -10, -60, -50, -40, -30, -20, -10], fontsize=12)
     ax.set_ylabel("Z-scored firing rate")
-    ax.set_xlabel("Bins before DT, Left | Right")
-    ax.set_title("12D Firing rate profiles")
-    ax.legend(ncol=4, loc="upper center", bbox_to_anchor=(0.5, 1.22), frameon=False)
+    ax.set_xlabel("Bins before DT (ms), Left | Right", fontsize=12.4)
+    #ax.set_title("12D Firing rate profiles")
+    ax.legend(ncol=4, loc="upper center", bbox_to_anchor=(0.5,1.2), frameon=False)
     return fig, ax
 
 

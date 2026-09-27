@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -526,6 +527,131 @@ _EXACT_SPN_DISPLAY_ORDER = (
 )
 
 
+def apply_fsi_audit_to_fixed_labels(
+    labels: pd.DataFrame,
+    audit: pd.DataFrame,
+    match_columns: list[str],
+    minimum_units_per_population: int = 1,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Attach an FSI audit to fixed clustering labels without reclustering.
+
+    Only rows explicitly marked ``strongly_fsi_like`` are removed from the
+    downstream CLAW unit set. All other assigned units retain their original
+    ``final_label`` and ``final_name`` values. The default of one is only a
+    nonempty-population guard and does not apply the former three-unit session
+    exclusion.
+    """
+    required_label_columns = {
+        "session",
+        "unit_id",
+        "final_label",
+        "final_name",
+        *match_columns,
+    }
+    required_audit_columns = {
+        "strongly_fsi_like",
+        *match_columns,
+    }
+    missing_label_columns = required_label_columns.difference(labels.columns)
+    missing_audit_columns = required_audit_columns.difference(audit.columns)
+    if missing_label_columns:
+        raise KeyError(f"Fixed-label table is missing: {sorted(missing_label_columns)}")
+    if missing_audit_columns:
+        raise KeyError(f"FSI audit is missing: {sorted(missing_audit_columns)}")
+
+    fixed = labels.loc[
+        (pd.to_numeric(labels["final_label"], errors="coerce") >= 0)
+        & labels["final_name"].notna()
+        & labels["final_name"].ne("unassigned")
+    ].copy()
+    audited = audit.copy()
+    if fixed.duplicated(match_columns).any():
+        raise ValueError(f"Fixed labels contain duplicate keys: {match_columns}")
+    if audited.duplicated(match_columns).any():
+        raise ValueError(f"FSI audit contains duplicate keys: {match_columns}")
+
+    audit_columns = [*match_columns, "strongly_fsi_like"]
+    if "final_name" in audited.columns:
+        audit_columns.append("final_name")
+    audited = audited[audit_columns].rename(
+        columns={"final_name": "audited_final_name"}
+    )
+    merged = fixed.merge(
+        audited,
+        on=match_columns,
+        how="outer",
+        validate="one_to_one",
+        indicator=True,
+    )
+    missing_from_audit = merged["_merge"].eq("left_only")
+    unexpected_in_audit = merged["_merge"].eq("right_only")
+    if missing_from_audit.any() or unexpected_in_audit.any():
+        raise ValueError(
+            "The FSI audit does not exactly match the assigned fixed labels: "
+            f"{int(missing_from_audit.sum())} missing and "
+            f"{int(unexpected_in_audit.sum())} unexpected units."
+        )
+    merged = merged.drop(columns="_merge")
+
+    if "audited_final_name" in merged.columns:
+        label_mismatch = merged["audited_final_name"].astype(str).ne(
+            merged["final_name"].astype(str)
+        )
+        if label_mismatch.any():
+            raise ValueError(
+                "The audit subtype names do not match the saved fixed labels."
+            )
+        merged = merged.drop(columns="audited_final_name")
+
+    audit_values = merged["strongly_fsi_like"].astype(str).str.strip().str.lower()
+    invalid_values = ~audit_values.isin(["true", "false"])
+    if invalid_values.any():
+        invalid = sorted(merged.loc[invalid_values, "strongly_fsi_like"].astype(str).unique())
+        raise ValueError(f"Invalid strongly_fsi_like values: {invalid}")
+    merged["strongly_fsi_like"] = audit_values.eq("true")
+    merged["retained_after_fsi_audit"] = ~merged["strongly_fsi_like"]
+
+    summaries: list[dict[str, Any]] = []
+    session_inclusion: dict[str, bool] = {}
+    for session, session_labels in merged.groupby("session", sort=False):
+        original_counts = session_labels["final_name"].value_counts()
+        retained = session_labels.loc[session_labels["retained_after_fsi_audit"]]
+        retained_counts = retained["final_name"].value_counts()
+        remaining = retained_counts.reindex(
+            _EXACT_SPN_DISPLAY_ORDER, fill_value=0
+        ).astype(int)
+        included = bool(remaining.min() >= int(minimum_units_per_population))
+        session_inclusion[str(session)] = included
+        row: dict[str, Any] = {
+            "session": str(session),
+            "fsi_audit_applied": True,
+            "fixed_labels_preserved": True,
+            "minimum_units_per_population": int(minimum_units_per_population),
+            "included_in_claw": included,
+            "n_units_assigned": int(len(session_labels)),
+            "n_units_excluded_as_fsi": int(session_labels["strongly_fsi_like"].sum()),
+            "n_units_for_claw": int(len(retained)),
+            "exclusion_reason": (
+                "" if included else "fewer_than_minimum_units_in_at_least_one_population"
+            ),
+        }
+        for population in _EXACT_SPN_DISPLAY_ORDER:
+            row[f"n_{population}"] = int(original_counts.get(population, 0))
+            row[f"n_{population}_for_claw"] = int(
+                retained_counts.get(population, 0)
+            )
+        summaries.append(row)
+
+    merged["session_included_in_claw"] = (
+        merged["session"].astype(str).map(session_inclusion).astype(bool)
+    )
+    merged["used_in_claw"] = (
+        merged["retained_after_fsi_audit"]
+        & merged["session_included_in_claw"]
+    )
+    return merged, pd.DataFrame(summaries)
+
+
 def _exact_causal_kernel(
     sigma_bins: float,
     truncate: float = 4.0,
@@ -1017,280 +1143,6 @@ def _stein_cluster_vectors_exact(
     return vectors
 
 
-def cluster_steinmetz_session_exact(payload: dict[str, Any]) -> dict[str, Any]:
-    """Execute the attached Steinmetz clustering notebook without simplification."""
-    spike_times = np.asarray(payload["spike_times"], dtype=float)
-    spike_clusters = np.asarray(payload["spike_clusters"], dtype=int)
-    stimulus_times = np.asarray(payload["stimulus_times"], dtype=float)
-    movement_onsets = np.asarray(payload["movement_onsets"], dtype=float)
-    choice = np.asarray(payload["choice"], dtype=int)
-    included = np.asarray(payload["included"], dtype=bool)
-    usable = np.asarray(payload["usable"], dtype=bool)
-    trials_left = np.asarray(payload["trials_left"], dtype=int)
-    trials_right = np.asarray(payload["trials_right"], dtype=int)
-    baseline_trials = np.asarray(payload["baseline_trials"], dtype=bool)
-    geometry = _stein_geometry_exact(float(payload["premove_gap_s"]))
-
-    retained_units: list[int] = []
-    features: list[np.ndarray] = []
-    for unit_id in np.asarray(payload["unit_ids_all"], dtype=int):
-        unit_spikes = np.sort(spike_times[spike_clusters == unit_id])
-        mean_rate = _stein_compute_unit_rate_exact(
-            unit_spikes, stimulus_times, baseline_trials, (0.00, 0.40)
-        )
-        if mean_rate < 0.1:
-            continue
-
-        if not _stein_passes_first_modulation_filter_exact(
-            unit_spikes,
-            stimulus_times,
-            movement_onsets,
-            baseline_trials,
-            trials_left,
-            trials_right,
-        ):
-            continue
-
-        baseline_rate = _stein_compute_unit_rate_exact(
-            unit_spikes, stimulus_times, baseline_trials, (-0.20, 0.00)
-        )
-        normalization = baseline_rate + 1.0
-
-        if not _stein_is_task_modulated_exact(
-            unit_spikes,
-            stimulus_times,
-            movement_onsets,
-            choice,
-            included,
-            usable,
-            int(payload["choice_left_code"]),
-            int(payload["choice_right_code"]),
-        ):
-            continue
-
-        left_mean = np.mean(
-            np.vstack(
-                [
-                    _stein_extract_feature_exact(
-                        unit_spikes,
-                        movement_onsets[trial],
-                        normalization,
-                        geometry,
-                        geometry["stage_a"],
-                    )
-                    for trial in trials_left
-                ]
-            ),
-            axis=0,
-        )
-        right_mean = np.mean(
-            np.vstack(
-                [
-                    _stein_extract_feature_exact(
-                        unit_spikes,
-                        movement_onsets[trial],
-                        normalization,
-                        geometry,
-                        geometry["stage_a"],
-                    )
-                    for trial in trials_right
-                ]
-            ),
-            axis=0,
-        )
-
-        stage_a_times = geometry["centers"][geometry["stage_a"]]
-        slope_left = np.polyfit(stage_a_times, left_mean, 1)[0]
-        slope_right = np.polyfit(stage_a_times, right_mean, 1)[0]
-        if (
-            not np.isfinite(slope_left)
-            or not np.isfinite(slope_right)
-            or slope_left < 1e-4
-            or slope_right < 1e-4
-        ):
-            continue
-
-        feature = np.concatenate([left_mean, right_mean])
-        if not np.all(np.isfinite(feature)) or np.ptp(feature) < 0.05:
-            continue
-        retained_units.append(int(unit_id))
-        features.append(feature)
-
-    if len(retained_units) < 8:
-        raise ValueError(
-            f"{payload['session']}: only {len(retained_units)} units after the original filters."
-        )
-
-    unit_ids = np.asarray(retained_units, dtype=int)
-    x12 = np.asarray(features, dtype=float)
-    x12_z = (x12 - x12.mean(axis=1, keepdims=True)) / (
-        x12.std(axis=1, keepdims=True) + _EXACT_EPS
-    )
-    raw_channel_labels = AgglomerativeClustering(
-        n_clusters=2, linkage="ward", metric="euclidean"
-    ).fit_predict(x12_z)
-    bias = x12[:, :6].mean(axis=1) - x12[:, 6:].mean(axis=1)
-    bias_zero = (
-        bias[raw_channel_labels == 0].mean()
-        if np.any(raw_channel_labels == 0)
-        else -np.inf
-    )
-    bias_one = (
-        bias[raw_channel_labels == 1].mean()
-        if np.any(raw_channel_labels == 1)
-        else -np.inf
-    )
-    left_channel_label = 0 if bias_zero > bias_one else 1
-    left_rows = np.where(raw_channel_labels == left_channel_label)[0]
-    right_rows = np.where(raw_channel_labels != left_channel_label)[0]
-    if left_rows.size < 2 or right_rows.size < 2:
-        raise ValueError(
-            f"{payload['session']}: Stage A produced a group smaller than two units."
-        )
-
-    all_stage_b_trials = np.sort(np.concatenate([trials_left, trials_right]))
-    baseline_rates: dict[int, float] = {}
-    for unit_id in unit_ids:
-        unit_spikes = np.sort(spike_times[spike_clusters == unit_id])
-        baseline_rates[int(unit_id)] = _stein_compute_unit_rate_exact(
-            unit_spikes, stimulus_times, baseline_trials, (-0.20, 0.00)
-        )
-
-    def build_stage_b_vector(unit_id: int, trial_list: np.ndarray) -> np.ndarray:
-        unit_spikes = np.sort(spike_times[spike_clusters == unit_id])
-        normalization = baseline_rates[int(unit_id)] + 1.0
-        segments = [
-            _stein_extract_feature_exact(
-                unit_spikes,
-                movement_onsets[trial],
-                normalization,
-                geometry,
-                geometry["stage_b"],
-            )
-            for trial in trial_list
-        ]
-        vector = np.concatenate(segments)
-        return (vector - vector.mean()) / (vector.std() + _EXACT_EPS)
-
-    stage_b_vectors: list[np.ndarray | None] = [None] * len(unit_ids)
-    for row, unit_id in enumerate(unit_ids):
-        vector = build_stage_b_vector(int(unit_id), all_stage_b_trials)
-        if np.all(np.isfinite(vector)) and np.std(vector) >= 1e-6:
-            stage_b_vectors[row] = vector
-
-    def split_channel(channel_rows: np.ndarray) -> tuple[np.ndarray, np.ndarray] | tuple[None, None]:
-        if channel_rows.size < 2 or all_stage_b_trials.size < 12:
-            return None, None
-        vectors: list[np.ndarray] = []
-        kept: list[int] = []
-        for row in channel_rows:
-            vector = stage_b_vectors[row]
-            if vector is None:
-                vector = build_stage_b_vector(
-                    int(unit_ids[row]), all_stage_b_trials
-                )
-            if not np.all(np.isfinite(vector)) or np.std(vector) < 1e-6:
-                continue
-            vectors.append(vector)
-            kept.append(int(row))
-        if len(kept) < 2:
-            return None, None
-
-        correlation = np.corrcoef(np.vstack(vectors))
-        correlation = np.nan_to_num(
-            np.clip(correlation, -1.0, 1.0), nan=0.0
-        )
-        np.fill_diagonal(correlation, 1.0)
-        distance = 1.0 - correlation
-        np.fill_diagonal(distance, 0.0)
-        kept_before_pruning = np.asarray(kept, dtype=int)
-        kept_after_pruning, sublabels = _stein_recluster_exact(
-            distance, minimum_size=3
-        )
-        if kept_after_pruning.size < 6:
-            return kept_before_pruning, np.zeros(
-                len(kept_before_pruning), dtype=int
-            )
-        return kept_before_pruning[kept_after_pruning], sublabels
-
-    kept_left, sublabels_left = split_channel(left_rows)
-    kept_right, sublabels_right = split_channel(right_rows)
-    if kept_left is None or kept_right is None:
-        raise ValueError(f"{payload['session']}: Stage B failed in the original pipeline.")
-
-    final_labels = np.full(len(unit_ids), -1, dtype=int)
-    final_names = np.array(["unassigned"] * len(unit_ids), dtype=object)
-    for row, label in zip(kept_left, sublabels_left):
-        final_labels[row] = int(label)
-        final_names[row] = f"L_sub{label}"
-    for row, label in zip(kept_right, sublabels_right):
-        final_labels[row] = int(label) + 2
-        final_names[row] = f"R_sub{label}"
-    left_row_set = set(left_rows.tolist())
-    lr_pref = np.array(
-        ["L" if row in left_row_set else "R" for row in range(len(unit_ids))],
-        dtype=object,
-    )
-
-    result = {
-        "dataset": "Steinmetz",
-        "session": payload["session"],
-        "session_folder": payload["session_folder"],
-        "unit_ids": unit_ids,
-        "x12": x12,
-        "x12_z": x12_z,
-        "lr_pref": lr_pref,
-        "raw_channel_labels": raw_channel_labels,
-        "left_channel_label": int(left_channel_label),
-        "final_labels": final_labels,
-        "final_names": final_names,
-        "geometry": geometry,
-        "source_payload": payload,
-    }
-
-    fast_trials, slow_trials, split_metadata = _stein_split_fast_slow_exact(
-        all_stage_b_trials,
-        np.asarray(payload["reaction_time_s"], dtype=float),
-    )
-    corr_fast = _exact_corr_matrix(
-        _stein_cluster_vectors_exact(result, fast_trials)
-    )
-    corr_slow = _exact_corr_matrix(
-        _stein_cluster_vectors_exact(result, slow_trials)
-    )
-    delta = corr_slow - corr_fast
-    best_pair: tuple[int, int] | None = None
-    best_drop = np.inf
-    for left_label in (0, 1):
-        for right_label in (2, 3):
-            drop = delta[left_label, right_label]
-            if np.isfinite(drop) and drop < best_drop:
-                best_drop = float(drop)
-                best_pair = (left_label, right_label)
-
-    name_map: dict[int, str] = {}
-    if best_pair is not None:
-        d_left, d_right = best_pair
-        name_map = {
-            int(d_left): "dSPN_left",
-            int(1 - d_left): "iSPN_left",
-            int(d_right): "dSPN_right",
-            int(5 - d_right): "iSPN_right",
-        }
-        for label, name in name_map.items():
-            final_names[final_labels == label] = name
-
-    result.update(
-        final_names=final_names,
-        name_map=name_map,
-        corr_fast=corr_fast,
-        corr_slow=corr_slow,
-        corr_drop=float(best_drop) if best_pair is not None else np.nan,
-        fast_trials=fast_trials,
-        slow_trials=slow_trials,
-        split_metadata=split_metadata,
-    )
-    return result
 
 
 def steinmetz_unit_profile_table_exact(result: dict[str, Any]) -> pd.DataFrame:
@@ -1354,15 +1206,21 @@ def steinmetz_correlation_table_exact(result: dict[str, Any]) -> pd.DataFrame:
 def steinmetz_population_activity_table_exact(
     result: dict[str, Any],
     claw_seed: int = 2000,
-    minimum_units_per_population: int = 3,
+    minimum_units_per_population: int = 1,
+    excluded_unit_ids: Iterable[int] | None = None,
 ) -> pd.DataFrame:
-    """Reproduce the activity table built in Steinmetz_CLAW_aggregated(2)."""
+    """Reproduce the activity table, optionally excluding post-clustering units."""
     from .datasets import _steinmetz_match_trials_exact
 
     payload = result["source_payload"]
     session_dir = Path(payload["session_dir"])
     final_names = np.asarray(result["final_names"], dtype=object)
     unit_ids = np.asarray(result["unit_ids"], dtype=int)
+    if excluded_unit_ids is not None:
+        excluded_unit_ids = np.asarray(list(excluded_unit_ids), dtype=int)
+        keep = ~np.isin(unit_ids, excluded_unit_ids)
+        final_names = final_names[keep]
+        unit_ids = unit_ids[keep]
     populations = _EXACT_SPN_DISPLAY_ORDER
     population_units = {
         population: unit_ids[final_names == population]
@@ -1371,9 +1229,13 @@ def steinmetz_population_activity_table_exact(
     if min(len(units) for units in population_units.values()) < int(
         minimum_units_per_population
     ):
+        population_counts = {
+            population: len(units) for population, units in population_units.items()
+        }
         raise ValueError(
             f"{result['session']}: fewer than {minimum_units_per_population} units "
-            "in at least one SPN population for the original CLAW analysis."
+            "in at least one SPN population for the CLAW analysis. "
+            f"Remaining counts: {population_counts}."
         )
 
     stimulus_times = np.asarray(payload["stimulus_times"], dtype=float)
@@ -1795,9 +1657,10 @@ def ibl_population_activity_table_exact(
     result: dict[str, Any],
     one: Any,
     claw_seed: int = 2000,
-    minimum_units_per_population: int = 3,
+    minimum_units_per_population: int = 1,
+    excluded_unit_ids: Iterable[int] | None = None,
 ) -> pd.DataFrame:
-    """Reproduce the firing-rate table in IBL_CLAW_aggregated(8)."""
+    """Reproduce the firing-rate table, optionally excluding post-clustering units."""
     from brainbox.io.one import SpikeSortingLoader
     from brainbox.population.decode import get_spike_counts_in_bins
     from .datasets import (
@@ -1814,6 +1677,11 @@ def ibl_population_activity_table_exact(
     assigned = np.asarray(result["final_labels"], dtype=int) >= 0
     unit_ids = unit_ids_all[assigned]
     final_names = final_names[assigned]
+    if excluded_unit_ids is not None:
+        excluded_unit_ids = np.asarray(list(excluded_unit_ids), dtype=int)
+        keep = ~np.isin(unit_ids, excluded_unit_ids)
+        unit_ids = unit_ids[keep]
+        final_names = final_names[keep]
     populations = _EXACT_SPN_DISPLAY_ORDER
     population_rows = {
         population: np.where(final_names == population)[0]
@@ -1822,9 +1690,13 @@ def ibl_population_activity_table_exact(
     if min(len(rows) for rows in population_rows.values()) < int(
         minimum_units_per_population
     ):
+        population_counts = {
+            population: len(rows) for population, rows in population_rows.items()
+        }
         raise ValueError(
             f"{result['session']}: fewer than {minimum_units_per_population} units "
-            "in at least one SPN population for the original CLAW analysis."
+            "in at least one SPN population for the CLAW analysis. "
+            f"Remaining counts: {population_counts}."
         )
 
     eid = result["eid"]
