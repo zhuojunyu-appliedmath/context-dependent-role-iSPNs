@@ -1,0 +1,4 @@
+control,original_mean_criteria_pass_percent,original_sessions_all_six_pass,original_total_sessions,n_joint_shuffles,null_mean_criteria_pass_percent,null_mean_criteria_pass_ci95_low_percent,null_mean_criteria_pass_ci95_high_percent,null_mean_sessions_all_six_pass,null_repetitions_at_least_original_percent,p_at_least_original_mean_criteria_percent
+isi_shuffle,95.83333333333334,3,4,50,22.08333333333333,18.333333333333332,25.835416666666642,0.1,0,0.0196078431372549
+choice_label_shuffle,95.83333333333334,3,4,50,61.16666666666666,57.41458333333334,64.83333333333334,0.3,0,0.0196078431372549
+speed_label_shuffle,95.83333333333334,3,4,50,65.99999999999999,62.66666666666666,69.33333333333333,0.76,1,0.0392156862745098
