@@ -104,11 +104,6 @@ https://int-brain-lab.github.io/ONE/notebooks/one_quickstart.html
 
 Users do not need to download the IBL recordings manually or add them to this repository. Notebook 03 connects to the public IBL OpenAlyx server through the ONE API and downloads the required data to the local ONE cache.
 
-### 04. Empirical clustering figures
-
-`04_spn_clustering_figures.ipynb` uses only the derived files from notebooks 02-03. 
-It generates Fig. 2 and SI Figs. S3-S4.
-
 ### 07-08. Post-clustering assessment of potential FSI contamination
 `07_steinmetz_fsi_audit.ipynb` and `08_ibl_fsi_audit.ipynb` assess only empirical units already retained and assigned by Notebooks 03 and 05. They measure peak-channel extracellular waveform width and whole-session firing rate and flag a unit as putative FSI only when its waveform width is below 0.15 ms and its firing rate exceeds 10 Hz. 
 They generate SI Figs. S6-S7 and save unit-level annotations for Notebook 09.
