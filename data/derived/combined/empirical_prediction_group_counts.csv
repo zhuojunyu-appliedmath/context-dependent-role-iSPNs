@@ -1,10 +1,10 @@
 dataset,prediction,group,n_trials,n_units,n_left_choices,n_right_choices,state_8_episode_denominator,state_8_END_numerator,direct_8_to_10_episode_denominator,direct_8_to_10_then_END_numerator,state_4_episode_denominator,state_4_END_numerator,direct_4_to_5_episode_denominator,direct_4_to_5_then_END_numerator,comparison,source_state,dest_state,group_definition,n_direct_source_to_dest,n_ended_source,n_ended_dest
-IBL+Steinmetz,1,GU_visited_1_2_3,543,11,282.0,261.0,,,,,,,,,,,,,,,
-IBL+Steinmetz,1,GL_visited_8_or_10,375,11,223.0,152.0,,,,,,,,,,,,,,,
-IBL+Steinmetz,1,GR_visited_4_or_5,302,11,109.0,193.0,,,,,,,,,,,,,,,
-IBL+Steinmetz,2,left_channel_8_to_10_base_V8,352,11,,,548.0,106.0,69.0,28.0,,,,,,,,,,,
-IBL+Steinmetz,2,right_channel_4_to_5_base_V4,288,11,,,,,,,427.0,89.0,31.0,12.0,,,,,,,
-IBL+Steinmetz,3,A,110,9,,,,,,,,,,,left_channel_10_then_later_11,10.0,11.0,V(10)=1 and no later 11 after 10,0.0,55.0,0.0
-IBL+Steinmetz,3,B,6,2,,,,,,,,,,,left_channel_10_then_later_11,10.0,11.0,V(10)=1 and later 11 after 10,3.0,3.0,3.0
-IBL+Steinmetz,3,A,48,8,,,,,,,,,,,right_channel_5_then_later_7,5.0,7.0,V(5)=1 and no later 7 after 5,0.0,24.0,0.0
-IBL+Steinmetz,3,B,8,5,,,,,,,,,,,right_channel_5_then_later_7,5.0,7.0,V(5)=1 and later 7 after 5,6.0,3.0,2.0
+IBL+Steinmetz,1,GU_visited_1_2_3,528,11,276.0,252.0,,,,,,,,,,,,,,,
+IBL+Steinmetz,1,GL_visited_8_or_10,373,11,218.0,155.0,,,,,,,,,,,,,,,
+IBL+Steinmetz,1,GR_visited_4_or_5,290,11,113.0,177.0,,,,,,,,,,,,,,,
+IBL+Steinmetz,2,left_channel_8_to_10_base_V8,351,11,,,531.0,105.0,57.0,20.0,,,,,,,,,,,
+IBL+Steinmetz,2,right_channel_4_to_5_base_V4,280,11,,,,,,,393.0,79.0,25.0,12.0,,,,,,,
+IBL+Steinmetz,3,A,91,8,,,,,,,,,,,left_channel_10_then_later_11,10.0,11.0,V(10)=1 and no later 11 after 10,0.0,45.0,0.0
+IBL+Steinmetz,3,B,8,2,,,,,,,,,,,left_channel_10_then_later_11,10.0,11.0,V(10)=1 and later 11 after 10,6.0,3.0,4.0
+IBL+Steinmetz,3,A,43,7,,,,,,,,,,,right_channel_5_then_later_7,5.0,7.0,V(5)=1 and no later 7 after 5,0.0,17.0,0.0
+IBL+Steinmetz,3,B,3,3,,,,,,,,,,,right_channel_5_then_later_7,5.0,7.0,V(5)=1 and later 7 after 5,2.0,0.0,2.0

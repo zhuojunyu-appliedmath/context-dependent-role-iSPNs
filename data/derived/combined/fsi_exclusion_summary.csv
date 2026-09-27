@@ -1,0 +1,12 @@
+dataset,session,fixed_labels_preserved,n_units_excluded_as_fsi,n_units_for_claw,n_dSPN_left_for_claw,n_dSPN_right_for_claw,n_iSPN_left_for_claw,n_iSPN_right_for_claw
+IBL,churchlandlab | CSHL049 | 2020-01-08,True,12,12,3,3,5,1
+IBL,cortexlab | KS086 | 2022-03-16,True,4,19,5,2,4,8
+IBL,danlab | DY_014 | 2020-07-18,True,2,27,4,6,7,10
+IBL,hoferlab | SWC_061 | 2020-11-23,True,0,24,9,3,8,4
+IBL,mrsicflogellab | SWC_038 | 2020-07-31,True,0,16,3,3,5,5
+IBL,mrsicflogellab | SWC_038 | 2020-08-01,True,0,35,3,26,3,3
+IBL,zadorlab | CSH_ZAD_026 | 2020-08-17,True,3,26,13,2,3,8
+Steinmetz,Hench_2017-06-18,True,0,50,3,24,19,4
+Steinmetz,Lederberg_2017-12-11,True,1,28,3,9,12,4
+Steinmetz,Radnitz_2017-01-12,True,5,45,6,23,13,3
+Steinmetz,Richards_2017-11-01,True,3,32,4,8,7,13
