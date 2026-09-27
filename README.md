@@ -1,15 +1,14 @@
-This repository contains the analysis code and derived data used to generate figures for "Striatal state context multiplexes the role of basal ganglia pathways
-during decision-making" [link]
+This repository contains the analysis code and derived data used to generate figures for "Basal ganglia pathway function depends on striatal state context during decision-making" [link]
 
 ## Quick start
 
 Run the notebooks in numerical order. 
-Notebooks 01-07 create derived data tables; notebooks 04, 05, 06, and 08 generate figures in the Manuscript and the Supporting Information.
+Notebooks 01-10 create derived data tables; notebooks 01, 02, 04, 06, 07, 08, and 11 generate figures in the Manuscript and the Supporting Information.
 
 ## Figures in the Manuscript
-Fig. 1A: schematic of mouse two-choice task
+Fig. 1A: schematic of reduced CBGT circuit
 
-Fig. 1B: schematic of reduced CBGT circuit
+Fig. 1B: schematic of mouse two-choice task
 
 Fig. 1C(i): simulated 12D SPN profiles | `01_cbgt_reference_clustering.ipynb` | `figures/main/Fig1C_i_cbgt_12D_profiles`
 
@@ -17,15 +16,16 @@ Fig. 1C(ii): fast/slow SPN correlations | `01_cbgt_reference_clustering.ipynb` |
 
 Fig. 1D: two-stage clustering schematic and validation | `01_cbgt_reference_clustering.ipynb` | `figures/main/Fig1D_two_stage_clustering`
 
-Fig. 2: example empirical SPN profiles | `04_spn_clustering_figures.ipynb` | `figures/main/Fig2_example_empirical_spn_profiles`
+Fig. 2: example empirical SPN profiles | `06_spn_clustering_figures.ipynb` | `figures/main/Fig2_example_empirical_spn_profiles`
 
-Fig. 3: CBGT and IBL CLAWs,  statistics from `05_claw_and_control_ensemble.ipynb` 
+Fig. 3: CBGT and IBL CLAWs,  statistics from `09_claw_and_control_ensemble.ipynb` 
 
-Fig. 4A: schematic of control ensembles 
+Fig. 4: model and empirical prediction tests | `11_prediction_boxplots.ipynb` | `figures/main/Fig4_multiplexed_iSPN_roles`
 
-Fig. 4B: changes in control ensemble engagement along the CBGT CLAW,  statistics from `05_claw_and_control_ensemble.ipynb` 
+Fig. 5A: schematic of control ensembles 
 
-Fig. 5: model and empirical prediction tests | `08_prediction_boxplots.ipynb` | `figures/main/Fig5_multiplexed_iSPN_roles`
+Fig. 5B: changes in control ensemble engagement along the CBGT CLAW,  statistics from `09_claw_and_control_ensemble.ipynb` 
+
 
 ## Figures in the Supporting Information 
 Fig. S1A: schematic of full CBGT circuit 
@@ -36,17 +36,21 @@ Fig. S1C: median decision time distributions of 300 CBGT networks
 
 Fig. S1D: SPN thresholds (Fig. S1A-D reproduced from https://doi.org/10.1371/journal.pcbi.1012966)
 
-Fig. S2: Steinmetz ISI-shuffle control | `06_steinmetz_isi_shuffle.ipynb` | `figures/supporting/FigS2_isi_shuffle_control`
+Fig. S2: Stage 1 bin-count validation | `02_cbgt_feature1_bin_count.ipynb` | `figures/supporting/FigS2_cbgt_feature1_bin_count_stage1_ari`
 
-Fig. S3: all Steinmetz clustering results | `04_spn_clustering_figures.ipynb` | `figures/supporting/FigS3_steinmetz_profiles_and_correlations`
+Fig. S3: all Steinmetz clustering results | `06_spn_clustering_figures.ipynb` | `figures/supporting/FigS3_steinmetz_profiles_and_correlations`
 
-Fig. S4: all IBL clustering results | `04_spn_clustering_figures.ipynb` | `figures/supporting/FigS4_ibl_profiles_and_correlations`
+Fig. S4: all IBL clustering results | `06_spn_clustering_figures.ipynb` | `figures/supporting/FigS4_ibl_profiles_and_correlations`
 
-Fig. S5: schematic of control ensemble in the full CBGT circuit, reproduced from https://doi.org/10.64898/2026.02.17.706272
+Fig. S5: Steinmetz shuffle controls | `04_steinmetz_shuffle_controls.ipynb` | `figures/supporting/FigS5_steinmetz_shuffle_controls`
 
-Fig. S6: Steinmetz CLAW, statistics from `05_claw_and_control_ensemble.ipynb`
+Fig. S6: Steinmetz post-clustering assessment of potential FSI contamination | `07_steinmetz_fsi_audit.ipynb` | `figures/supporting/FigS6_steinmetz_postclustering_spn_fsi_waveform_audit`
 
-Fig. S7: changes in drift rate and boundary height along the CBGT CLAW, statistics from `05_claw_and_control_ensemble_figures.ipynb` 
+Fig. S7: IBL post-clustering assessment of potential FSI contamination | `08_ibl_fsi_audit.ipynb` | `figures/supporting/FigS7_ibl_postclustering_spn_fsi_waveform_audit`
+
+Fig. S8: schematic of control ensemble in the full CBGT circuit, reproduced from https://doi.org/10.64898/2026.02.17.706272
+
+Fig. S9: changes in drift rate and boundary height along the CBGT CLAW, statistics from `09_claw_and_control_ensemble_figures.ipynb` 
 
 
 ## Notebook workflow
@@ -55,13 +59,17 @@ Fig. S7: changes in drift rate and boundary height along the CBGT CLAW, statisti
 
 `01_cbgt_reference_clustering.ipynb` reads the 300 simulated networks, constructs the 12-dimensional pre-decision features and full pre-decision firing rate table, validates the two-stage clustering against known pathway/channel labels, prepares the simulated CLAW state table, and generates Fig. 1C-D.
 
-### 02-03. Empirical SPN inference
+### 02. Stage 1 bin-count analysis
 
-`02_steinmetz_spn_clustering.ipynb` and `03_ibl_spn_clustering.ipynb` apply the same inference pipeline to the Steinmetz and IBL recordings. 
+`02_cbgt_feature1_bin_count.ipynb` reads the derived 12D feature table from Notebook 01 and tests Stage 1 action-channel recovery with total feature dimensions from 2D to 12D. It does not rerun raw-data preprocessing or Stage 2 clustering. It generates SI Fig. S2.
+
+### 03-05. Empirical SPN inference and shuffle controls
+
+`03_steinmetz_spn_clustering.ipynb` and `05_ibl_spn_clustering.ipynb` apply the same two-stage inference pipeline to the Steinmetz and IBL recordings. The labels saved by these notebooks remain fixed in all downstream analyses.
 
 #### Steinmetz recordings
 
-Notebook 02 requires the original recordings from Steinmetz et al. (2019):
+Notebook 03 requires the original recordings from Steinmetz et al. (2019):
 
 https://www.nature.com/articles/s41586-019-1787-x
 
@@ -78,9 +86,11 @@ Download and extract the following four sessions:
 
 Place the four session folders directly under `data/source/steinmetz/`
 
+`04_steinmetz_shuffle_controls.ipynb` applies three controls to the Steinmetz recordings: within-unit ISI shuffling, evidence-stratified choice-label shuffling, and fast/slow-label shuffling within each choice condition. Each control uses 50 repetitions per session. Original and shuffled datasets are compared by the percentage of predicted temporal criteria satisfied. It generates SI Fig. S5.
+
 #### IBL recordings
 
-Notebook 03 analyzes recordings from the IBL Brain-Wide Map dataset:
+Notebook 05 analyzes recordings from the IBL Brain-Wide Map dataset:
 
 https://www.nature.com/articles/s41586-025-09235-0
 
@@ -99,24 +109,25 @@ Users do not need to download the IBL recordings manually or add them to this re
 `04_spn_clustering_figures.ipynb` uses only the derived files from notebooks 02-03. 
 It generates Fig. 2 and SI Figs. S3-S4.
 
-### 05. CLAWs and control ensembles
+### 07-08. Post-clustering assessment of potential FSI contamination
+`07_steinmetz_fsi_audit.ipynb` and `08_ibl_fsi_audit.ipynb` assess only empirical units already retained and assigned by Notebooks 03 and 05. They measure peak-channel extracellular waveform width and whole-session firing rate and flag a unit as putative FSI only when its waveform width is below 0.15 ms and its firing rate exceeds 10 Hz. 
+They generate SI Figs. S6-S7 and save unit-level annotations for Notebook 09.
+These notebooks do not rerun clustering or alter any saved subtype label. The CBGT populations are not subjected to this assessment because their SPN identities are known from the model.
+
+### 09. CLAWs and control ensembles
 
 `F_matrix.npy` and `D_matrix.npy` under `data/source/cbgt` were generated in https://doi.org/10.1371/journal.pcbi.1012966
 
-`05_claw_and_control_ensemble.ipynb` binarizes the four inferred SPN populations, compresses consecutive repetitions of the same state, estimates transition and terminal probabilities, and generates state-level behavioral statistics for Fig. 3 and SI Fig. S6. 
+`09_claw_and_control_ensemble.ipynb` binarizes the four inferred SPN populations, compresses consecutive repetitions of the same state, estimates transition and terminal probabilities, and generates state-level behavioral statistics for Fig. 3. 
 
-It then projects CBGT state transitions onto the control ensembles and DDM parameters to generate state-level behavioral statistics for Fig. 4B and SI Fig. S7.
+The notebook also estimates state-level choice probability, decision time, transition probability, and terminal probability. It then projects CBGT state transitions onto the control ensembles and DDM parameters to generate the statistics used in Fig. 5 and SI Fig. S9.
 
-### 06. ISI-shuffle control
+### 10-11. Prediction analyses and boxplots
 
-`06_steinmetz_isi_shuffle.ipynb` permutes each unit’s interspike intervals, reconstructs surrogate spike trains, reruns the full clustering procedure 50 times per recording, and reports the fraction of shuffles satisfying the prespecified SPN temporal-pattern criteria. It generates SI Fig. S2.
-
-### 07-08. Prediction analyses and boxplots
-
-`07_prediction_statistics.ipynb` performs statistical analyses for three predictions:
+`10_prediction_statistics.ipynb` performs statistical analyses for three predictions:
 
 1. Left-choice probability in iSPN-only versus dSPN-containing states.
 2. Terminal probability before and after same-channel dSPN+iSPN coactivation.
 3. Decision time with and without later opponent-channel iSPN recruitment.
 
-`08_prediction_boxplots.ipynb` generates Fig. 5 from the standardized bootstrap, raw decision time, and significance test tables.
+`11_prediction_boxplots.ipynb` generates Fig. 4 from the standardized bootstrap, raw decision time, and significance test tables.
